@@ -1,10 +1,11 @@
+# This file configures the build and deployment settings for Netlify.
 [build]
-  # This is the directory to publish, which contains your site's HTML, CSS, and JS
+  # This is the directory to publish, which contains your site's HTML, CSS, and JS.
   publish = "src/"
-  # This is the directory where Netlify Functions are stored
+  # This is the directory where Netlify Functions are stored.
   functions = "netlify/functions/"
 
+# This section configures the behavior of Netlify Functions.
 [functions]
-  # Specifies the Node.js version for your functions
+  # We use esbuild for faster function bundling.
   node_bundler = "esbuild"
-  node_version = "20"
