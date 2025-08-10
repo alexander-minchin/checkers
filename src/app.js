@@ -8,6 +8,7 @@ const emailInput = document.getElementById('email-input');
 const usernameInput = document.getElementById('username-input');
 const signinButton = document.getElementById('signin-button');
 const authError = document.getElementById('auth-error');
+const authSuccess = document.getElementById('auth-success');
 const userGreeting = document.getElementById('user-greeting');
 const logoutButton = document.getElementById('logout-button');
 
@@ -69,40 +70,53 @@ async function callApi(endpoint, body) {
     return response.json();
 }
 
-// --- Auth Logic ---
+// --- Auth Logic (Corrected) ---
 signinButton.addEventListener('click', async () => {
     const email = emailInput.value;
     const username = usernameInput.value;
     authError.textContent = '';
+    authSuccess.textContent = '';
 
-    try {
-        // Check if user exists
-        const { data: { users }, error: countError } = await window.supabase.auth.admin.listUsers({ email });
-        if(countError) throw countError;
+    if (!email) {
+        authError.textContent = 'Email is required.';
+        return;
+    }
+    
+    // This is the key object for Supabase to know this user already exists.
+    const USER_ALREADY_REGISTERED = 'user_already_registered';
 
-        if (users.length > 0) {
-            // User exists, sign them in
-            const { error } = await window.supabase.auth.signInWithOtp({ email });
-            if (error) throw error;
-            alert('Check your email for a login link!');
-        } else {
-            // New user, sign them up
-            if (!username) {
-                authError.textContent = 'Username is required for new accounts.';
-                return;
+    // Attempt to sign up the user first.
+    // This is how we can create a user with a specific username.
+    const { data, error } = await window.supabase.auth.signUp({
+        email,
+        password: Math.random().toString(36).slice(-8), // Dummy password for magic link flow
+        options: {
+            data: {
+                username: username || email.split('@')[0] // Default username if not provided
             }
-            const { error } = await window.supabase.auth.signUp({ 
-                email, 
-                password: Math.random().toString(36).slice(-8), // Dummy password
-                options: { data: { username } } 
-            });
-            if (error) throw error;
-            alert('Check your email for a confirmation link!');
         }
-    } catch (error) {
-        authError.textContent = error.message;
+    });
+
+    if (error) {
+        // If the error is that the user already exists, we sign them in instead.
+        if (error.message.includes(USER_ALREADY_REGISTERED)) {
+            authSuccess.textContent = 'User already exists. Sending a sign-in link...';
+            const { error: signInError } = await window.supabase.auth.signInWithOtp({ email });
+            if (signInError) {
+                authError.textContent = signInError.message;
+            } else {
+                authSuccess.textContent = 'Sign-in link sent! Check your email.';
+            }
+        } else {
+            // A different error occurred during sign-up.
+            authError.textContent = error.message;
+        }
+    } else {
+        // Sign-up was successful (or a confirmation link was sent).
+        authSuccess.textContent = 'Confirmation link sent! Check your email to finish signing up.';
     }
 });
+
 
 logoutButton.addEventListener('click', async () => {
     await window.supabase.auth.signOut();
@@ -124,12 +138,28 @@ function handleAuthStateChange(event, session) {
 }
 
 async function fetchUserProfile() {
+    // If the user's profile doesn't have a username yet, prompt them.
     const { data, error } = await window.supabase
         .from('profiles')
         .select('username')
         .eq('id', currentUser.id)
         .single();
-    if(data) {
+    
+    if (error || !data) {
+        console.error("Could not fetch profile", error);
+        return;
+    }
+    
+    if (!data.username) {
+        const newUsername = prompt("Welcome! Please choose a username.");
+        if (newUsername) {
+            await window.supabase
+                .from('profiles')
+                .update({ username: newUsername })
+                .eq('id', currentUser.id);
+            userGreeting.textContent = `Hi, ${newUsername}!`;
+        }
+    } else {
         userGreeting.textContent = `Hi, ${data.username}!`;
     }
 }
@@ -256,6 +286,11 @@ function subscribeToCurrentGame() {
 }
 
 function handleGameUpdate(game) {
+    if (!game.game_state) {
+        // Game might be waiting for players
+        updateStatus(game);
+        return;
+    }
     renderBoard(game.game_state.board);
     updateStatus(game);
     checkGameEnd(game);
@@ -327,7 +362,7 @@ boardElement.addEventListener('click', async (e) => {
             alert(`Invalid move: ${error.message}`);
             // Re-fetch state to be safe
             const { data: game } = await window.supabase.from('games').select('*, game_players(*, profiles(username))').eq('id', currentGameId).single();
-            handleGameUpdate(game);
+            if(game) handleGameUpdate(game);
         } finally {
             clearSelection();
         }

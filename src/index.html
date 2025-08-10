@@ -14,6 +14,9 @@
         const SUPABASE_ANON_KEY = '[[ .Site.Env.SUPABASE_ANON_KEY ]]';
 
         // Initialize Supabase client
+        if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+            alert("Supabase environment variables are not set. Please check your Netlify site configuration.");
+        }
         const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         window.supabase = supabase;
     </script>
@@ -45,6 +48,7 @@
                 <input id="username-input" type="text" placeholder="Username (for new accounts)" class="w-full px-4 py-2 border rounded-md mb-4">
                 <button id="signin-button" class="w-full bg-purple-600 text-white py-2 rounded-md hover:bg-purple-700">Sign In / Sign Up</button>
                 <p id="auth-error" class="text-red-500 mt-4"></p>
+                 <p id="auth-success" class="text-green-500 mt-4"></p>
             </div>
         </div>
 
