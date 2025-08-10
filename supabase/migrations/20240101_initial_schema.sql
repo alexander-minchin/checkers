@@ -51,12 +51,10 @@ CREATE POLICY "Users can view games they are a player in." ON games
       WHERE game_players.game_id = games.id AND game_players.player_id = auth.uid()
     )
   );
--- No INSERT, UPDATE, DELETE policies for users on GAMES. This must be done by serverless functions.
 
 -- RLS Policies for GAME_PLAYERS
 CREATE POLICY "Users can view their own game player entries." ON game_players
   FOR SELECT USING (auth.uid() = player_id);
--- No INSERT, UPDATE, DELETE policies for users on GAME_PLAYERS.
 
 -- Function to create a profile for a new user
 CREATE OR REPLACE FUNCTION public.handle_new_user()
